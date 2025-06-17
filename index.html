@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisador de Ganho de Peso dos Animais</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.4/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: #dbeafe !important;
+        }
+        
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .stat-card p {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-above {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-below {
+            background-color: #fef2f2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useCallback } = React;
+        const { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } = Recharts;
+
+        const AnimalWeightAnalyzer = () => {
+            const [data, setData] = useState(null);
+            const [processedData, setProcessedData] = useState(null);
+            const [selectedPasto, setSelectedPasto] = useState('all');
+            const [loading, setLoading] = useState(false);
+
+            const processFile = useCallback((file) => {
+                setLoading(true);
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    try {
+                        let parsedData;
+                        
+                        if (file.name.endsWith('.csv')) {
+                            const csv = e.target.result;
+                            parsedData = Papa.parse(csv, {
+                                header: true,
+                                skipEmptyLines: true,
+                                dynamicTyping: true
+                            }).data;
+                        } else {
+                            const workbook = XLSX.read(e.target.result, { type: 'array' });
+                            const sheetName = workbook.SheetNames[0];
+                            parsedData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                        }
+                        
+                        parsedData = parsedData.map(row => {
+                            const cleanRow = {};
+                            Object.keys(row).forEach(key => {
+                                const cleanKey = key.trim().toUpperCase();
+                                cleanRow[cleanKey] = row[key];
+                            });
+                            return cleanRow;
+                        });
+                        
+                        setData(parsedData);
+                        calculateWeightGain(parsedData);
+                    } catch (error) {
+                        alert('Erro ao processar arquivo: ' + error.message);
+                    }
+                    setLoading(false);
+                };
+                
+                if (file.name.endsWith('.csv')) {
+                    reader.readAsText(file);
+                } else {
+                    reader.readAsArrayBuffer(file);
+                }
+            }, []);
+
+            const parseDate = (dateStr) => {
+                if (!dateStr) return null;
+                
+                const dateString = dateStr.toString().trim();
+                
+                if (!isNaN(dateString) && dateString.length > 4) {
+                    const excelEpoch = new Date(1900, 0, 1);
+                    const jsDate = new Date(excelEpoch.getTime() + (parseInt(dateString) - 2) * 24 * 60 * 60 * 1000);
+                    return jsDate;
+                }
+                
+                const formats = [
+                    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+                    /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+                    /^(\d{1,2})-(\d{1,2})-(\d{4})$/,
+                ];
+                
+                for (let i = 0; i < formats.length; i++) {
+                    const format = formats[i];
+                    const match = dateString.match(format);
+                    if (match) {
+                        let parsedDate;
+                        if (i === 1) {
+                            parsedDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+                        } else {
+                            parsedDate = new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+                        }
+                        return parsedDate;
+                    }
+                }
+                
+                const date = new Date(dateString);
+                if (!isNaN(date.getTime()) && date.getFullYear() > 1990) {
+                    return date;
+                }
+                
+                return null;
+            };
+
+            const calculateWeightGain = (rawData) => {
+                try {
+                    const animalGroups = _.groupBy(rawData, row => {
+                        const animal = row.ANIMAL || row.animal || row.Animal;
+                        return animal ? animal.toString().trim() : 'UNKNOWN';
+                    });
+                    
+                    const results = [];
+                    
+                    Object.entries(animalGroups).forEach(([animalName, records]) => {
+                        if (records.length < 2) return;
+                        
+                        const sortedRecords = records
+                            .map(record => ({
+                                ...record,
+                                parsedDate: parseDate(record.DATA_PESAGEM || record.data_pesagem || record.Data_Pesagem || record['DATA PESAGEM'])
+                            }))
+                            .filter(record => record.parsedDate && !isNaN(record.PESO || record.peso || record.Peso))
+                            .sort((a, b) => a.parsedDate - b.parsedDate);
+                        
+                        if (sortedRecords.length < 2) return;
+                        
+                        const gains = [];
+                        
+                        for (let i = 1; i < sortedRecords.length; i++) {
+                            const current = sortedRecords[i];
+                            const previous = sortedRecords[i - 1];
+                            
+                            const peso1 = previous.PESO || previous.peso || previous.Peso;
+                            const peso2 = current.PESO || current.peso || current.Peso;
+                            const days = (current.parsedDate - previous.parsedDate) / (1000 * 60 * 60 * 24);
+                            
+                            if (days > 0) {
+                                const weightGain = peso2 - peso1;
+                                const dailyGain = weightGain / days;
+                                gains.push(dailyGain);
+                            }
+                        }
+                        
+                        if (gains.length > 0) {
+                            const avgDailyGain = _.mean(gains);
+                            const lastRecord = sortedRecords[sortedRecords.length - 1];
+                            
+                            results.push({
+                                animal: animalName,
+                                local: (lastRecord.LOCAL || lastRecord.local || lastRecord.Local || 'N/A').toString(),
+                                sexo: lastRecord.SX || lastRecord.sx || lastRecord.Sx || 'N/A',
+                                ganho_diario: parseFloat(avgDailyGain.toFixed(4)),
+                                total_pesagens: sortedRecords.length,
+                                peso_inicial: sortedRecords[0].PESO || sortedRecords[0].peso || sortedRecords[0].Peso,
+                                peso_final: lastRecord.PESO || lastRecord.peso || lastRecord.Peso
+                            });
+                        }
+                    });
+                    
+                    setProcessedData(results);
+                } catch (error) {
+                    alert('Erro ao calcular ganho de peso: ' + error.message);
+                }
+            };
+
+            const getFilteredData = () => {
+                if (!processedData) return [];
+                if (selectedPasto === 'all') return processedData;
+                return processedData.filter(item => item.local === selectedPasto);
+            };
+
+            const getScatterData = () => {
+                const filtered = getFilteredData();
+                if (filtered.length === 0) return { data: [], media: 0 };
+                
+                const media = _.mean(filtered.map(item => item.ganho_diario));
+                
+                const scatterData = filtered.map((item, index) => ({
+                    x: index + 1,
+                    y: item.ganho_diario,
+                    animal: item.animal,
+                    local: item.local,
+                    sexo: item.sexo,
+                    acima_media: item.ganho_diario >= media
+                }));
+                
+                return { data: scatterData, media: parseFloat(media.toFixed(4)) };
+            };
+
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    processFile(file);
+                }
+            };
+
+            const handleDragOver = (event) => {
+                event.preventDefault();
+                event.currentTarget.classList.add('drag-over');
+            };
+
+            const handleDragLeave = (event) => {
+                event.preventDefault();
+                event.currentTarget.classList.remove('drag-over');
+            };
+
+            const handleDrop = (event) => {
+                event.preventDefault();
+                event.currentTarget.classList.remove('drag-over');
+                const file = event.dataTransfer.files[0];
+                if (file) {
+                    processFile(file);
+                }
+            };
+
+            const uniqueLocals = processedData ? [...new Set(processedData.map(item => item.local))] : [];
+            const { data: scatterData, media } = getScatterData();
+            const filteredData = getFilteredData();
+
+            const CustomTooltip = ({ active, payload }) => {
+                if (active && payload && payload.length) {
+                    const data = payload[0].payload;
+                    return React.createElement('div', {
+                        className: 'bg-white p-3 border rounded shadow-lg',
+                        style: { backgroundColor: 'white', padding: '12px', border: '1px solid #ccc', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }
+                    }, [
+                        React.createElement('p', { key: 'animal', style: { fontWeight: 'bold', margin: '4px 0' } }, `Animal: ${data.animal}`),
+                        React.createElement('p', { key: 'local', style: { margin: '4px 0' } }, `Local: ${data.local}`),
+                        React.createElement('p', { key: 'sexo', style: { margin: '4px 0' } }, `Sexo: ${data.sexo}`),
+                        React.createElement('p', { key: 'ganho', style: { margin: '4px 0' } }, `Ganho diário: ${data.y} kg/dia`),
+                        React.createElement('p', { 
+                            key: 'status', 
+                            style: { 
+                                margin: '4px 0', 
+                                color: data.acima_media ? '#059669' : '#dc2626',
+                                fontWeight: '500'
+                            } 
+                        }, data.acima_media ? "Acima da média" : "Abaixo da média")
+                    ]);
+                }
+                return null;
+            };
+
+            return React.createElement('div', { 
+                style: { 
+                    maxWidth: '1200px', 
+                    margin: '0 auto', 
+                    padding: '24px',
+                    backgroundColor: '#f8fafc',
+                    minHeight: '100vh'
+                }
+            }, [
+                React.createElement('div', { key: 'main-card', className: 'card' }, [
+                    React.createElement('div', { key: 'header', style: { marginBottom: '24px' } }, [
+                        React.createElement('h1', { 
+                            key: 'title',
+                            style: { 
+                                fontSize: '32px', 
+                                fontWeight: 'bold', 
+                                color: '#1f2937',
+                                marginBottom: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                            }
+                        }, [
+                            React.createElement('span', { key: 'icon', style: { color: '#059669' } }, '📈'),
+                            'Analisador de Ganho de Peso dos Animais'
+                        ]),
+                        React.createElement('p', { 
+                            key: 'subtitle',
+                            style: { 
+                                color: '#6b7280', 
+                                fontSize: '16px',
+                                margin: 0
+                            }
+                        }, 'Faça upload da sua planilha para analisar o ganho de peso diário por animal e pasto')
+                    ]),
+
+                    !data && React.createElement('div', {
+                        key: 'upload-area',
+                        style: {
+                            border: '2px dashed #d1d5db',
+                            borderRadius: '12px',
+                            padding: '48px',
+                            textAlign: 'center',
+                            transition: 'all 0.2s',
+                            cursor: 'pointer'
+                        },
+                        onDragOver: handleDragOver,
+                        onDragLeave: handleDragLeave,
+                        onDrop: handleDrop
+                    }, [
+                        React.createElement('div', { key: 'upload-icon', style: { fontSize: '48px', marginBottom: '16px' } }, '📁'),
+                        React.createElement('p', { key: 'upload-text', style: { fontSize: '20px', fontWeight: '500', color: '#4b5563', marginBottom: '8px' } }, 'Arraste e solte sua planilha aqui'),
+                        React.createElement('p', { key: 'or-text', style: { color: '#6b7280', marginBottom: '16px' } }, 'ou'),
+                        React.createElement('label', { key: 'upload-btn', className: 'btn-primary', style: { display: 'inline-block', cursor: 'pointer' } }, [
+                            '📤 Selecionar arquivo',
+                            React.createElement('input', {
+                                key: 'file-input',
+                                type: 'file',
+                                accept: '.csv,.xlsx,.xls',
+                                onChange: handleFileUpload,
+                                style: { display: 'none' }
+                            })
+                        ]),
+                        React.createElement('p', { 
+                            key: 'formats',
+                            style: { 
+                                fontSize: '14px', 
+                                color: '#6b7280', 
+                                marginTop: '16px',
+                                margin: '16px 0 0 0'
+                            }
+                        }, 'Formatos suportados: CSV, Excel (.xlsx, .xls)')
+                    ]),
+
+                    loading && React.createElement('div', { key: 'loading', style: { textAlign: 'center', padding: '32px' } }, [
+                        React.createElement('div', { key: 'spinner', className: 'loading-spinner' }),
+                        React.createElement('p', { key: 'loading-text', style: { marginTop: '16px', color: '#6b7280' } }, 'Processando dados...')
+                    ])
+                ]),
+
+                processedData && React.createElement('div', { key: 'results' }, [
+                    React.createElement('div', { key: 'filters', className: 'card' }, [
+                        React.createElement('div', { key: 'filter-content', style: { display: 'flex', alignItems: 'center', gap: '16px' } }, [
+                            React.createElement('span', { key: 'filter-icon', style: { fontSize: '20px' } }, '🔍'),
+                            React.createElement('label', { key: 'filter-label', style: { fontWeight: '500', color: '#374151' } }, 'Filtrar por pasto:'),
+                            React.createElement('select', {
+                                key: 'filter-select',
+                                value: selectedPasto,
+                                onChange: (e) => setSelectedPasto(e.target.value),
+                                style: {
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '6px',
+                                    padding: '8px 12px',
+                                    outline: 'none'
+                                }
+                            }, [
+                                React.createElement('option', { key: 'all', value: 'all' }, 'Todos os pastos'),
+                                ...uniqueLocals.map(local => 
+                                    React.createElement('option', { key: local, value: local }, local)
+                                )
+                            ])
+                        ])
+                    ]),
+
+                    React.createElement('div', { key: 'stats', style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' } }, [
+                        React.createElement('div', { key: 'stat1', className: 'stat-card', style: { backgroundColor: '#dbeafe' } }, [
+                            React.createElement('h3', { key: 'stat1-title', style: { color: '#1e40af' } }, 'Total de Animais'),
+                            React.createElement('p', { key: 'stat1-value', style: { color: '#1d4ed8' } }, filteredData.length)
+                        ]),
+                        React.createElement('div', { key: 'stat2', className: 'stat-card', style: { backgroundColor: '#dcfce7' } }, [
+                            React.createElement('h3', { key: 'stat2-title', style: { color: '#166534' } }, 'Média de Ganho'),
+                            React.createElement('p', { key: 'stat2-value', style: { color: '#15803d' } }, `${media} kg/dia`)
+                        ]),
+                        React.createElement('div', { key: 'stat3', className: 'stat-card', style: { backgroundColor: '#f3e8ff' } }, [
+                            React.createElement('h3', { key: 'stat3-title', style: { color: '#7c3aed' } }, 'Acima da Média'),
+                            React.createElement('p', { key: 'stat3-value', style: { color: '#8b5cf6' } }, filteredData.filter(item => item.ganho_diario >= media).length)
+                        ]),
+                        React.createElement('div', { key: 'stat4', className: 'stat-card', style: { backgroundColor: '#fef2f2' } }, [
+                            React.createElement('h3', { key: 'stat4-title', style: { color: '#dc2626' } }, 'Abaixo da Média'),
+                            React.createElement('p', { key: 'stat4-value', style: { color: '#ef4444' } }, filteredData.filter(item => item.ganho_diario < media).length)
+                        ])
+                    ]),
+
+                    React.createElement('div', { key: 'chart', className: 'card' }, [
+                        React.createElement('h2', { 
+                            key: 'chart-title',
+                            style: { 
+                                fontSize: '20px', 
+                                fontWeight: 'bold', 
+                                color: '#1f2937',
+                                marginBottom: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }
+                        }, [
+                            React.createElement('span', { key: 'chart-icon', style: { color: '#3b82f6' } }, '📊'),
+                            'Ganho de Peso Diário por Animal',
+                            selectedPasto !== 'all' && React.createElement('span', { 
+                                key: 'filter-info',
+                                style: { fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }
+                            }, `- ${selectedPasto}`)
+                        ]),
+                        
+                        React.createElement(ResponsiveContainer, { key: 'chart-container', width: "100%", height: 400 },
+                            React.createElement(ScatterChart, { margin: { top: 20, right: 20, bottom: 20, left: 20 } }, [
+                                React.createElement(CartesianGrid, { key: 'grid', strokeDasharray: "3 3" }),
+                                React.createElement(XAxis, { 
+                                    key: 'xaxis',
+                                    type: "number", 
+                                    dataKey: "x", 
+                                    name: "Animal", 
+                                    domain: [0, scatterData.length + 1],
+                                    label: { value: 'Animais (ordem)', position: 'insideBottom', offset: -10 }
+                                }),
+                                React.createElement(YAxis, { 
+                                    key: 'yaxis',
+                                    type: "number", 
+                                    dataKey: "y", 
+                                    name: "Ganho",
+                                    label: { value: 'Ganho diário (kg/dia)', angle: -90, position: 'insideLeft' }
+                                }),
+                                React.createElement(Tooltip, { key: 'tooltip', content: CustomTooltip }),
+                                React.createElement(Legend, { key: 'legend' }),
+                                
+                                React.createElement(ReferenceLine, { 
+                                    key: 'reference',
+                                    y: media, 
+                                    stroke: "#666", 
+                                    strokeDasharray: "5 5", 
+                                    label: { value: `Média: ${media} kg/dia`, position: 'topRight' }
+                                }),
+                                
+                                React.createElement(Scatter, {
+                                    key: 'scatter-above',
+                                    name: "Acima da média",
+                                    data: scatterData.filter(item => item.acima_media),
+                                    fill: "#10b981"
+                                }),
+                                
+                                React.createElement(Scatter, {
+                                    key: 'scatter-below',
+                                    name: "Abaixo da média",
+                                    data: scatterData.filter(item => !item.acima_media),
+                                    fill: "#ef4444"
+                                })
+                            ])
+                        )
+                    ]),
+
+                    React.createElement('div', { key: 'table', className: 'card' }, [
+                        React.createElement('h2', { 
+                            key: 'table-title',
+                            style: { 
+                                fontSize: '20px', 
+                                fontWeight: 'bold', 
+                                color: '#1f2937',
+                                marginBottom: '16px'
+                            }
+                        }, 'Detalhes por Animal'),
+                        React.createElement('div', { key: 'table-container', className: 'table-container' },
+                            React.createElement('table', { key: 'table-element' }, [
+                                React.createElement('thead', { key: 'thead' },
+                                    React.createElement('tr', { key: 'header-row' }, [
+                                        React.createElement('th', { key: 'h1' }, 'Animal'),
+                                        React.createElement('th', { key: 'h2' }, 'Pasto'),
+                                        React.createElement('th', { key: 'h3' }, 'Sexo'),
+                                        React.createElement('th', { key: 'h4' }, 'Ganho Diário (kg/dia)'),
+                                        React.createElement('th', { key: 'h5' }, 'Peso Inicial'),
+                                        React.createElement('th', { key: 'h6' }, 'Peso Final'),
+                                        React.createElement('th', { key: 'h7' }, 'Status')
+                                    ])
+                                ),
+                                React.createElement('tbody', { key: 'tbody' },
+                                    filteredData
+                                        .sort((a, b) => b.ganho_diario - a.ganho_diario)
+                                        .map((item, index) => 
+                                            React.createElement('tr', { key: `row-${index}`, style: { backgroundColor: index % 2 === 0 ? '#f9fafb' : 'white' } }, [
+                                                React.createElement('td', { key: 'c1', style: { fontWeight: '500' } }, item.animal),
+                                                React.createElement('td', { key: 'c2' }, item.local),
+                                                React.createElement('td', { key: 'c3' }, item.sexo),
+                                                React.createElement('td', { key: 'c4', style: { fontWeight: '600' } }, item.ganho_diario),
+                                                React.createElement('td', { key: 'c5' }, `${item.peso_inicial} kg`),
+                                                React.createElement('td', { key: 'c6' }, `${item.peso_final} kg`),
+                                                React.createElement('td', { key: 'c7' },
+                                                    React.createElement('span', {
+                                                        className: `status-badge ${item.ganho_diario >= media ? 'status-above' : 'status-below'}`
+                                                    }, item.ganho_diario >= media ? 'Acima da média' : 'Abaixo da média')
+                                                )
+                                            ])
+                                        )
+                                )
+                            ])
+                        )
+                    ])
+                ])
+            ]);
+        };
+
+        ReactDOM.render(React.createElement(AnimalWeightAnalyzer), document.getElementById('root'));
+    </script>
+</body>
+</html>
