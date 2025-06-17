@@ -4,580 +4,676 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analisador de Ganho de Peso dos Animais</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f9fafb;
+            color: #1f2937;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px;
+            min-height: 100vh;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        
+        .subtitle {
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 48px;
+            text-align: center;
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #3b82f6;
+        }
+        
+        .upload-area.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            opacity: 0.4;
+        }
+        
+        .upload-btn {
+            background: #3b82f6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        
+        .upload-btn:hover {
+            background: #2563eb;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 32px;
+        }
+        
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .filters {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .filters select {
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 8px 12px;
+            background: white;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            padding: 16px;
+            border-radius: 6px;
+        }
+        
+        .stat-card.blue { background: #eff6ff; }
+        .stat-card.green { background: #f0fdf4; }
+        .stat-card.purple { background: #faf5ff; }
+        .stat-card.red { background: #fef2f2; }
+        
+        .stat-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .blue h3, .blue .value { color: #1e40af; }
+        .green h3, .green .value { color: #166534; }
+        .purple h3, .purple .value { color: #7c3aed; }
+        .red h3, .red .value { color: #dc2626; }
+        
+        .chart-container {
+            margin: 24px 0;
+            height: 400px;
+            position: relative;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin-top: 16px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        tbody tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-badge.above {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-badge.below {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+    </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1>📈 Analisador de Ganho de Peso dos Animais</h1>
+            </div>
+            <p class="subtitle">
+                Faça upload da sua planilha para analisar o ganho de peso diário por animal e pasto
+            </p>
 
-    <!-- React e React DOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Recharts -->
-    <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
-    
-    <!-- XLSX para Excel -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- PapaParse para CSV -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <!-- Lodash -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
-    
-    <!-- Babel para transformar JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Script de verificação -->
-    <script>
-        // Verificar se todas as bibliotecas carregaram
-        window.addEventListener('load', function() {
-            const missing = [];
-            if (typeof React === 'undefined') missing.push('React');
-            if (typeof ReactDOM === 'undefined') missing.push('ReactDOM');
-            if (typeof Recharts === 'undefined') missing.push('Recharts');
-            if (typeof XLSX === 'undefined') missing.push('XLSX');
-            if (typeof Papa === 'undefined') missing.push('PapaParse');
-            if (typeof _ === 'undefined') missing.push('Lodash');
-            if (typeof Babel === 'undefined') missing.push('Babel');
-            
-            if (missing.length > 0) {
-                document.body.innerHTML = `
-                    <div style="padding: 20px; text-align: center; font-family: Arial;">
-                        <h2 style="color: red;">❌ Erro ao carregar bibliotecas</h2>
-                        <p>Bibliotecas não carregadas: <strong>${missing.join(', ')}</strong></p>
-                        <p>Verifique sua conexão com a internet e recarregue a página.</p>
-                        <button onclick="location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Recarregar</button>
+            <div id="uploadArea" class="upload-area">
+                <div class="upload-icon">📁</div>
+                <p style="font-size: 20px; font-weight: 500; margin-bottom: 8px;">
+                    Arraste e solte sua planilha aqui
+                </p>
+                <p style="color: #6b7280; margin-bottom: 16px;">ou</p>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    📂 Selecionar arquivo
+                </button>
+                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" class="hidden">
+                <p style="font-size: 14px; color: #6b7280; margin-top: 16px;">
+                    Formatos suportados: CSV, Excel (.xlsx, .xls)
+                </p>
+            </div>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Processando dados...</p>
+            </div>
+
+            <div id="results" class="hidden">
+                <div class="filters">
+                    <span>🔍</span>
+                    <label style="font-weight: 500;">Filtrar por pasto:</label>
+                    <select id="pastoFilter">
+                        <option value="all">Todos os pastos</option>
+                    </select>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card blue">
+                        <h3>Total de Animais</h3>
+                        <div class="value" id="totalAnimals">0</div>
                     </div>
-                `;
-            }
-        });
-    </script>
+                    <div class="stat-card green">
+                        <h3>Média de Ganho</h3>
+                        <div class="value" id="avgGain">0 kg/dia</div>
+                    </div>
+                    <div class="stat-card purple">
+                        <h3>Acima da Média</h3>
+                        <div class="value" id="aboveAvg">0</div>
+                    </div>
+                    <div class="stat-card red">
+                        <h3>Abaixo da Média</h3>
+                        <div class="value" id="belowAvg">0</div>
+                    </div>
+                </div>
 
-    <script type="text/babel">
-        const { useState, useCallback } = React;
-        const { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } = Recharts;
+                <div class="card">
+                    <h2 class="section-title">
+                        📊 Ganho de Peso Diário por Animal
+                        <span id="filterLabel" style="font-size: 14px; font-weight: normal; color: #6b7280;"></span>
+                    </h2>
+                    <div class="chart-container">
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                </div>
 
-        // Componentes de ícones do Lucide
-        const Upload = () => React.createElement('svg', {
-            width: 24,
-            height: 24,
-            viewBox: '0 0 24 24',
-            fill: 'none',
-            stroke: 'currentColor',
-            strokeWidth: 2,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round'
-        }, [
-            React.createElement('path', { key: 1, d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
-            React.createElement('polyline', { key: 2, points: '17,8 12,3 7,8' }),
-            React.createElement('line', { key: 3, x1: 12, y1: 3, x2: 12, y2: 15 })
-        ]);
+                <div class="card">
+                    <h2 class="section-title">📋 Detalhes por Animal</h2>
+                    <div class="table-container">
+                        <table id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Animal</th>
+                                    <th>Pasto</th>
+                                    <th>Sexo</th>
+                                    <th>Ganho Diário (kg/dia)</th>
+                                    <th>Peso Inicial</th>
+                                    <th>Peso Final</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        const BarChart3 = () => React.createElement('svg', {
-            width: 24,
-            height: 24,
-            viewBox: '0 0 24 24',
-            fill: 'none',
-            stroke: 'currentColor',
-            strokeWidth: 2,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round'
-        }, [
-            React.createElement('path', { key: 1, d: 'M3 3v18h18' }),
-            React.createElement('path', { key: 2, d: 'M18.7 8l-5.1 5.2-2.8-2.7L7 14.3' })
-        ]);
+    <script>
+        let processedData = null;
+        let chart = null;
 
-        const TrendingUp = () => React.createElement('svg', {
-            width: 24,
-            height: 24,
-            viewBox: '0 0 24 24',
-            fill: 'none',
-            stroke: 'currentColor',
-            strokeWidth: 2,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round'
-        }, [
-            React.createElement('polyline', { key: 1, points: '22,7 13.5,15.5 8.5,10.5 2,17' }),
-            React.createElement('polyline', { key: 2, points: '16,7 22,7 22,13' })
-        ]);
+        // Event listeners
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+        document.getElementById('pastoFilter').addEventListener('change', updateResults);
 
-        const Filter = () => React.createElement('svg', {
-            width: 24,
-            height: 24,
-            viewBox: '0 0 24 24',
-            fill: 'none',
-            stroke: 'currentColor',
-            strokeWidth: 2,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round'
-        }, [
-            React.createElement('polygon', { key: 1, points: '22,3 2,3 10,12.46 10,19 14,21 14,12.46' })
-        ]);
+        // Drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('drop', handleDrop);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
 
-        const AnimalWeightAnalyzer = () => {
-            const [data, setData] = useState(null);
-            const [processedData, setProcessedData] = useState(null);
-            const [selectedPasto, setSelectedPasto] = useState('all');
-            const [loading, setLoading] = useState(false);
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
 
-            const processFile = useCallback((file) => {
-                setLoading(true);
-                const reader = new FileReader();
-                
-                reader.onload = (e) => {
-                    try {
-                        let parsedData;
-                        
-                        if (file.name.endsWith('.csv')) {
-                            const csv = e.target.result;
-                            parsedData = Papa.parse(csv, {
-                                header: true,
-                                skipEmptyLines: true,
-                                dynamicTyping: true
-                            }).data;
-                        } else {
-                            const workbook = XLSX.read(e.target.result, { type: 'array' });
-                            const sheetName = workbook.SheetNames[0];
-                            parsedData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-                        }
-                        
-                        parsedData = parsedData.map(row => {
-                            const cleanRow = {};
-                            Object.keys(row).forEach(key => {
-                                const cleanKey = key.trim().toUpperCase();
-                                cleanRow[cleanKey] = row[key];
-                            });
-                            return cleanRow;
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) processFile(file);
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (file) processFile(file);
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('uploadArea').classList.add('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function processFile(file) {
+            showLoading();
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    let parsedData;
+
+                    if (file.name.endsWith('.csv')) {
+                        const csv = e.target.result;
+                        parsedData = Papa.parse(csv, {
+                            header: true,
+                            skipEmptyLines: true,
+                            dynamicTyping: true
+                        }).data;
+                    } else {
+                        const workbook = XLSX.read(e.target.result, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        parsedData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    }
+
+                    // Limpar headers
+                    parsedData = parsedData.map(row => {
+                        const cleanRow = {};
+                        Object.keys(row).forEach(key => {
+                            const cleanKey = key.trim().toUpperCase();
+                            cleanRow[cleanKey] = row[key];
                         });
-                        
-                        setData(parsedData);
-                        calculateWeightGain(parsedData);
-                    } catch (error) {
-                        alert('Erro ao processar arquivo: ' + error.message);
-                    }
-                    setLoading(false);
-                };
-                
-                if (file.name.endsWith('.csv')) {
-                    reader.readAsText(file);
-                } else {
-                    reader.readAsArrayBuffer(file);
-                }
-            }, []);
+                        return cleanRow;
+                    });
 
-            const parseDate = (dateStr) => {
-                if (!dateStr) return null;
-                
-                const dateString = dateStr.toString().trim();
-                
-                if (!isNaN(dateString) && dateString.length > 4) {
-                    const excelEpoch = new Date(1900, 0, 1);
-                    const jsDate = new Date(excelEpoch.getTime() + (parseInt(dateString) - 2) * 24 * 60 * 60 * 1000);
-                    return jsDate;
+                    calculateWeightGain(parsedData);
+                } catch (error) {
+                    alert('Erro ao processar arquivo: ' + error.message);
+                    hideLoading();
                 }
-                
-                const formats = [
-                    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
-                    /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
-                    /^(\d{1,2})-(\d{1,2})-(\d{4})$/,
-                ];
-                
-                for (let i = 0; i < formats.length; i++) {
-                    const format = formats[i];
-                    const match = dateString.match(format);
-                    if (match) {
-                        let parsedDate;
-                        if (i === 1) {
-                            parsedDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
-                        } else {
-                            parsedDate = new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
-                        }
-                        return parsedDate;
-                    }
-                }
-                
-                const date = new Date(dateString);
-                if (!isNaN(date.getTime()) && date.getFullYear() > 1990) {
-                    return date;
-                }
-                
-                return null;
             };
 
-            const calculateWeightGain = (rawData) => {
-                try {
-                    const animalGroups = _.groupBy(rawData, row => {
-                        const animal = row.ANIMAL || row.animal || row.Animal;
-                        return animal ? animal.toString().trim() : 'UNKNOWN';
-                    });
-                    
-                    const results = [];
-                    
-                    Object.entries(animalGroups).forEach(([animalName, records]) => {
-                        if (records.length < 2) return;
-                        
-                        const sortedRecords = records
-                            .map(record => ({
-                                ...record,
-                                parsedDate: parseDate(record.DATA_PESAGEM || record.data_pesagem || record.Data_Pesagem)
-                            }))
-                            .filter(record => record.parsedDate && !isNaN(record.PESO || record.peso || record.Peso))
-                            .sort((a, b) => a.parsedDate - b.parsedDate);
-                        
-                        if (sortedRecords.length < 2) return;
-                        
-                        const gains = [];
-                        
-                        for (let i = 1; i < sortedRecords.length; i++) {
-                            const current = sortedRecords[i];
-                            const previous = sortedRecords[i - 1];
-                            
-                            const peso1 = previous.PESO || previous.peso || previous.Peso;
-                            const peso2 = current.PESO || current.peso || current.Peso;
-                            const days = (current.parsedDate - previous.parsedDate) / (1000 * 60 * 60 * 24);
-                            
-                            if (days > 0) {
-                                const weightGain = peso2 - peso1;
-                                const dailyGain = weightGain / days;
-                                gains.push(dailyGain);
+            if (file.name.endsWith('.csv')) {
+                reader.readAsText(file);
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+
+            const dateString = dateStr.toString().trim();
+
+            // Se for um número (timestamp do Excel)
+            if (!isNaN(dateString) && dateString.length > 4) {
+                const excelEpoch = new Date(1900, 0, 1);
+                const jsDate = new Date(excelEpoch.getTime() + (parseInt(dateString) - 2) * 24 * 60 * 60 * 1000);
+                return jsDate;
+            }
+
+            // Tentar diferentes formatos
+            const formats = [
+                /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+                /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+                /^(\d{1,2})-(\d{1,2})-(\d{4})$/,
+            ];
+
+            for (let i = 0; i < formats.length; i++) {
+                const format = formats[i];
+                const match = dateString.match(format);
+                if (match) {
+                    let parsedDate;
+                    if (i === 1) {
+                        parsedDate = new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+                    } else {
+                        parsedDate = new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+                    }
+                    return parsedDate;
+                }
+            }
+
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime()) && date.getFullYear() > 1990) {
+                return date;
+            }
+
+            return null;
+        }
+
+        function calculateWeightGain(rawData) {
+            try {
+                const animalGroups = _.groupBy(rawData, row => {
+                    const animal = row.ANIMAL || row.animal || row.Animal;
+                    return animal ? animal.toString().trim() : 'UNKNOWN';
+                });
+
+                const results = [];
+
+                Object.entries(animalGroups).forEach(([animalName, records]) => {
+                    if (records.length < 2) return;
+
+                    const sortedRecords = records
+                        .map(record => ({
+                            ...record,
+                            parsedDate: parseDate(record.DATA_PESAGEM || record.data_pesagem || record.Data_Pesagem)
+                        }))
+                        .filter(record => record.parsedDate && !isNaN(record.PESO || record.peso || record.Peso))
+                        .sort((a, b) => a.parsedDate - b.parsedDate);
+
+                    if (sortedRecords.length < 2) return;
+
+                    const gains = [];
+                    for (let i = 1; i < sortedRecords.length; i++) {
+                        const current = sortedRecords[i];
+                        const previous = sortedRecords[i - 1];
+
+                        const peso1 = previous.PESO || previous.peso || previous.Peso;
+                        const peso2 = current.PESO || current.peso || current.Peso;
+                        const days = (current.parsedDate - previous.parsedDate) / (1000 * 60 * 60 * 24);
+
+                        if (days > 0) {
+                            const weightGain = peso2 - peso1;
+                            const dailyGain = weightGain / days;
+                            gains.push(dailyGain);
+                        }
+                    }
+
+                    if (gains.length > 0) {
+                        const avgDailyGain = _.mean(gains);
+                        const lastRecord = sortedRecords[sortedRecords.length - 1];
+
+                        results.push({
+                            animal: animalName,
+                            local: (lastRecord.LOCAL || lastRecord.local || lastRecord.Local || 'N/A').toString(),
+                            sexo: lastRecord.SX || lastRecord.sx || lastRecord.Sx || 'N/A',
+                            ganho_diario: parseFloat(avgDailyGain.toFixed(4)),
+                            total_pesagens: sortedRecords.length,
+                            peso_inicial: sortedRecords[0].PESO || sortedRecords[0].peso || sortedRecords[0].Peso,
+                            peso_final: lastRecord.PESO || lastRecord.peso || lastRecord.Peso
+                        });
+                    }
+                });
+
+                processedData = results;
+                setupFilters();
+                updateResults();
+                hideLoading();
+                document.getElementById('results').classList.remove('hidden');
+            } catch (error) {
+                alert('Erro ao calcular ganho de peso: ' + error.message);
+                hideLoading();
+            }
+        }
+
+        function setupFilters() {
+            const pastoFilter = document.getElementById('pastoFilter');
+            const uniqueLocals = [...new Set(processedData.map(item => item.local))];
+
+            // Limpar opções existentes (exceto "Todos")
+            pastoFilter.innerHTML = '<option value="all">Todos os pastos</option>';
+
+            uniqueLocals.forEach(local => {
+                const option = document.createElement('option');
+                option.value = local;
+                option.textContent = local;
+                pastoFilter.appendChild(option);
+            });
+        }
+
+        function getFilteredData() {
+            if (!processedData) return [];
+            const selectedPasto = document.getElementById('pastoFilter').value;
+            if (selectedPasto === 'all') return processedData;
+            return processedData.filter(item => item.local === selectedPasto);
+        }
+
+        function updateResults() {
+            const filteredData = getFilteredData();
+            if (filteredData.length === 0) return;
+
+            const media = _.mean(filteredData.map(item => item.ganho_diario));
+            
+            // Atualizar estatísticas
+            document.getElementById('totalAnimals').textContent = filteredData.length;
+            document.getElementById('avgGain').textContent = media.toFixed(4) + ' kg/dia';
+            document.getElementById('aboveAvg').textContent = filteredData.filter(item => item.ganho_diario >= media).length;
+            document.getElementById('belowAvg').textContent = filteredData.filter(item => item.ganho_diario < media).length;
+
+            // Atualizar label do filtro
+            const selectedPasto = document.getElementById('pastoFilter').value;
+            document.getElementById('filterLabel').textContent = selectedPasto !== 'all' ? `- ${selectedPasto}` : '';
+
+            updateChart(filteredData, media);
+            updateTable(filteredData, media);
+        }
+
+        function updateChart(data, media) {
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+
+            const scatterData = data.map((item, index) => ({
+                x: index + 1,
+                y: item.ganho_diario,
+                animal: item.animal,
+                local: item.local,
+                sexo: item.sexo
+            }));
+
+            const acimaDaMedia = scatterData.filter(item => item.y >= media);
+            const abaixoDaMedia = scatterData.filter(item => item.y < media);
+
+            chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Acima da média',
+                        data: acimaDaMedia,
+                        backgroundColor: '#10b981',
+                        pointRadius: 6
+                    }, {
+                        label: 'Abaixo da média',
+                        data: abaixoDaMedia,
+                        backgroundColor: '#ef4444',
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Animais (ordem)'
+                            },
+                            min: 0,
+                            max: data.length + 1
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Ganho diário (kg/dia)'
                             }
                         }
-                        
-                        if (gains.length > 0) {
-                            const avgDailyGain = _.mean(gains);
-                            const lastRecord = sortedRecords[sortedRecords.length - 1];
-                            
-                            results.push({
-                                animal: animalName,
-                                local: (lastRecord.LOCAL || lastRecord.local || lastRecord.Local || 'N/A').toString(),
-                                sexo: lastRecord.SX || lastRecord.sx || lastRecord.Sx || 'N/A',
-                                ganho_diario: parseFloat(avgDailyGain.toFixed(4)),
-                                total_pesagens: sortedRecords.length,
-                                peso_inicial: sortedRecords[0].PESO || sortedRecords[0].peso || sortedRecords[0].Peso,
-                                peso_final: lastRecord.PESO || lastRecord.peso || lastRecord.Peso
-                            });
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const data = context.raw;
+                                    return [
+                                        `Animal: ${data.animal}`,
+                                        `Local: ${data.local}`,
+                                        `Sexo: ${data.sexo}`,
+                                        `Ganho diário: ${data.y} kg/dia`,
+                                        data.y >= media ? 'Acima da média' : 'Abaixo da média'
+                                    ];
+                                }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: media,
+                                    yMax: media,
+                                    borderColor: '#666',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: `Média: ${media.toFixed(4)} kg/dia`,
+                                        enabled: true,
+                                        position: 'end'
+                                    }
+                                }
+                            }
                         }
-                    });
-                    
-                    setProcessedData(results);
-                } catch (error) {
-                    alert('Erro ao calcular ganho de peso: ' + error.message);
+                    }
                 }
-            };
+            });
+        }
 
-            const getFilteredData = () => {
-                if (!processedData) return [];
-                if (selectedPasto === 'all') return processedData;
-                return processedData.filter(item => item.local === selectedPasto);
-            };
+        function updateTable(data, media) {
+            const tbody = document.querySelector('#resultsTable tbody');
+            tbody.innerHTML = '';
 
-            const getScatterData = () => {
-                const filtered = getFilteredData();
-                if (filtered.length === 0) return { data: [], media: 0 };
+            const sortedData = data.sort((a, b) => b.ganho_diario - a.ganho_diario);
+
+            sortedData.forEach(item => {
+                const row = document.createElement('tr');
+                const isAboveAverage = item.ganho_diario >= media;
                 
-                const media = _.mean(filtered.map(item => item.ganho_diario));
-                
-                const scatterData = filtered.map((item, index) => ({
-                    x: index + 1,
-                    y: item.ganho_diario,
-                    animal: item.animal,
-                    local: item.local,
-                    sexo: item.sexo,
-                    acima_media: item.ganho_diario >= media
-                }));
-                
-                return { data: scatterData, media: parseFloat(media.toFixed(4)) };
-            };
-
-            const handleFileUpload = (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    processFile(file);
-                }
-            };
-
-            const handleDragOver = (event) => {
-                event.preventDefault();
-            };
-
-            const handleDrop = (event) => {
-                event.preventDefault();
-                const file = event.dataTransfer.files[0];
-                if (file) {
-                    processFile(file);
-                }
-            };
-
-            const uniqueLocals = processedData ? [...new Set(processedData.map(item => item.local))] : [];
-            const { data: scatterData, media } = getScatterData();
-            const filteredData = getFilteredData();
-
-            const CustomTooltip = ({ active, payload }) => {
-                if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return React.createElement('div', {
-                        className: "bg-white p-3 border rounded shadow-lg"
-                    }, [
-                        React.createElement('p', { key: 1, className: "font-semibold" }, `Animal: ${data.animal}`),
-                        React.createElement('p', { key: 2 }, `Local: ${data.local}`),
-                        React.createElement('p', { key: 3 }, `Sexo: ${data.sexo}`),
-                        React.createElement('p', { key: 4 }, `Ganho diário: ${data.y} kg/dia`),
-                        React.createElement('p', { 
-                            key: 5, 
-                            className: data.acima_media ? "text-green-600" : "text-red-600" 
-                        }, data.acima_media ? "Acima da média" : "Abaixo da média")
-                    ]);
-                }
-                return null;
-            };
-
-            return React.createElement('div', {
-                className: "max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen"
-            }, [
-                React.createElement('div', {
-                    key: 'main',
-                    className: "bg-white rounded-lg shadow-lg p-6 mb-6"
-                }, [
-                    React.createElement('h1', {
-                        key: 'title',
-                        className: "text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2"
-                    }, [
-                        React.createElement(TrendingUp, { key: 'icon', className: "text-green-600" }),
-                        'Analisador de Ganho de Peso dos Animais'
-                    ]),
-                    React.createElement('p', {
-                        key: 'subtitle',
-                        className: "text-gray-600 mb-6"
-                    }, 'Faça upload da sua planilha para analisar o ganho de peso diário por animal e pasto'),
-
-                    // Upload area
-                    !data && React.createElement('div', {
-                        key: 'upload',
-                        className: "border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors",
-                        onDragOver: handleDragOver,
-                        onDrop: handleDrop
-                    }, [
-                        React.createElement(Upload, { key: 'upload-icon', className: "mx-auto h-12 w-12 text-gray-400 mb-4" }),
-                        React.createElement('p', { key: 'upload-text1', className: "text-xl font-medium text-gray-600 mb-2" }, 'Arraste e solte sua planilha aqui'),
-                        React.createElement('p', { key: 'upload-text2', className: "text-gray-500 mb-4" }, 'ou'),
-                        React.createElement('label', {
-                            key: 'upload-label',
-                            className: "bg-blue-600 text-white px-6 py-3 rounded-lg cursor-pointer hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
-                        }, [
-                            React.createElement(Upload, { key: 'label-icon', size: 20 }),
-                            'Selecionar arquivo',
-                            React.createElement('input', {
-                                key: 'file-input',
-                                type: 'file',
-                                accept: '.csv,.xlsx,.xls',
-                                onChange: handleFileUpload,
-                                className: 'hidden'
-                            })
-                        ]),
-                        React.createElement('p', { key: 'upload-text3', className: "text-sm text-gray-500 mt-4" }, 'Formatos suportados: CSV, Excel (.xlsx, .xls)')
-                    ]),
-
-                    // Loading
-                    loading && React.createElement('div', {
-                        key: 'loading',
-                        className: "text-center py-8"
-                    }, [
-                        React.createElement('div', { key: 'spinner', className: "inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" }),
-                        React.createElement('p', { key: 'loading-text', className: "mt-2 text-gray-600" }, 'Processando dados...')
-                    ]),
-
-                    // Results
-                    processedData && React.createElement('div', {
-                        key: 'results',
-                        className: "space-y-6"
-                    }, [
-                        // Filters
-                        React.createElement('div', {
-                            key: 'filters',
-                            className: "bg-gray-50 p-4 rounded-lg"
-                        }, [
-                            React.createElement('div', {
-                                key: 'filter-content',
-                                className: "flex items-center gap-4"
-                            }, [
-                                React.createElement(Filter, { key: 'filter-icon', className: "text-gray-600" }),
-                                React.createElement('label', { key: 'filter-label', className: "font-medium text-gray-700" }, 'Filtrar por pasto:'),
-                                React.createElement('select', {
-                                    key: 'filter-select',
-                                    value: selectedPasto,
-                                    onChange: (e) => setSelectedPasto(e.target.value),
-                                    className: "border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                }, [
-                                    React.createElement('option', { key: 'all', value: 'all' }, 'Todos os pastos'),
-                                    ...uniqueLocals.map(local => 
-                                        React.createElement('option', { key: local, value: local }, local)
-                                    )
-                                ])
-                            ])
-                        ]),
-
-                        // Statistics
-                        React.createElement('div', {
-                            key: 'stats',
-                            className: "grid grid-cols-1 md:grid-cols-4 gap-4"
-                        }, [
-                            React.createElement('div', { key: 'stat1', className: "bg-blue-50 p-4 rounded-lg" }, [
-                                React.createElement('h3', { key: 'title1', className: "font-semibold text-blue-800" }, 'Total de Animais'),
-                                React.createElement('p', { key: 'value1', className: "text-2xl font-bold text-blue-600" }, filteredData.length)
-                            ]),
-                            React.createElement('div', { key: 'stat2', className: "bg-green-50 p-4 rounded-lg" }, [
-                                React.createElement('h3', { key: 'title2', className: "font-semibold text-green-800" }, 'Média de Ganho'),
-                                React.createElement('p', { key: 'value2', className: "text-2xl font-bold text-green-600" }, `${media} kg/dia`)
-                            ]),
-                            React.createElement('div', { key: 'stat3', className: "bg-purple-50 p-4 rounded-lg" }, [
-                                React.createElement('h3', { key: 'title3', className: "font-semibold text-purple-800" }, 'Acima da Média'),
-                                React.createElement('p', { key: 'value3', className: "text-2xl font-bold text-purple-600" }, 
-                                    filteredData.filter(item => item.ganho_diario >= media).length
-                                )
-                            ]),
-                            React.createElement('div', { key: 'stat4', className: "bg-red-50 p-4 rounded-lg" }, [
-                                React.createElement('h3', { key: 'title4', className: "font-semibold text-red-800" }, 'Abaixo da Média'),
-                                React.createElement('p', { key: 'value4', className: "text-2xl font-bold text-red-600" }, 
-                                    filteredData.filter(item => item.ganho_diario < media).length
-                                )
-                            ])
-                        ]),
-
-                        // Chart
-                        React.createElement('div', {
-                            key: 'chart',
-                            className: "bg-white p-6 rounded-lg border"
-                        }, [
-                            React.createElement('h2', {
-                                key: 'chart-title',
-                                className: "text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"
-                            }, [
-                                React.createElement(BarChart3, { key: 'chart-icon', className: "text-blue-600" }),
-                                'Ganho de Peso Diário por Animal',
-                                selectedPasto !== 'all' && React.createElement('span', {
-                                    key: 'chart-subtitle',
-                                    className: "text-sm font-normal text-gray-600"
-                                }, ` - ${selectedPasto}`)
-                            ]),
-                            
-                            React.createElement(ResponsiveContainer, {
-                                key: 'chart-container',
-                                width: "100%",
-                                height: 400
-                            }, 
-                                React.createElement(ScatterChart, {
-                                    margin: { top: 20, right: 20, bottom: 20, left: 20 }
-                                }, [
-                                    React.createElement(CartesianGrid, { key: 'grid', strokeDasharray: "3 3" }),
-                                    React.createElement(XAxis, {
-                                        key: 'xaxis',
-                                        type: "number",
-                                        dataKey: "x",
-                                        name: "Animal",
-                                        domain: [0, scatterData.length + 1],
-                                        label: { value: 'Animais (ordem)', position: 'insideBottom', offset: -10 }
-                                    }),
-                                    React.createElement(YAxis, {
-                                        key: 'yaxis',
-                                        type: "number",
-                                        dataKey: "y",
-                                        name: "Ganho",
-                                        label: { value: 'Ganho diário (kg/dia)', angle: -90, position: 'insideLeft' }
-                                    }),
-                                    React.createElement(Tooltip, { key: 'tooltip', content: React.createElement(CustomTooltip) }),
-                                    React.createElement(Legend, { key: 'legend' }),
-                                    React.createElement(ReferenceLine, {
-                                        key: 'refline',
-                                        y: media,
-                                        stroke: "#666",
-                                        strokeDasharray: "5 5",
-                                        label: { value: `Média: ${media} kg/dia`, position: 'topRight' }
-                                    }),
-                                    React.createElement(Scatter, {
-                                        key: 'scatter1',
-                                        name: "Acima da média",
-                                        data: scatterData.filter(item => item.acima_media),
-                                        fill: "#10b981"
-                                    }),
-                                    React.createElement(Scatter, {
-                                        key: 'scatter2',
-                                        name: "Abaixo da média",
-                                        data: scatterData.filter(item => !item.acima_media),
-                                        fill: "#ef4444"
-                                    })
-                                ])
-                            )
-                        ]),
-
-                        // Table
-                        React.createElement('div', {
-                            key: 'table',
-                            className: "bg-white p-6 rounded-lg border"
-                        }, [
-                            React.createElement('h2', {
-                                key: 'table-title',
-                                className: "text-xl font-bold text-gray-800 mb-4"
-                            }, 'Detalhes por Animal'),
-                            React.createElement('div', {
-                                key: 'table-container',
-                                className: "overflow-x-auto"
-                            }, [
-                                React.createElement('table', {
-                                    key: 'table-element',
-                                    className: "min-w-full table-auto"
-                                }, [
-                                    React.createElement('thead', {
-                                        key: 'thead',
-                                        className: "bg-gray-50"
-                                    }, [
-                                        React.createElement('tr', { key: 'header-row' }, [
-                                            React.createElement('th', { key: 'h1', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Animal'),
-                                            React.createElement('th', { key: 'h2', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Pasto'),
-                                            React.createElement('th', { key: 'h3', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Sexo'),
-                                            React.createElement('th', { key: 'h4', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Ganho Diário (kg/dia)'),
-                                            React.createElement('th', { key: 'h5', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Peso Inicial'),
-                                            React.createElement('th', { key: 'h6', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Peso Final'),
-                                            React.createElement('th', { key: 'h7', className: "px-4 py-2 text-left font-semibold text-gray-700" }, 'Status')
-                                        ])
-                                    ]),
-                                    React.createElement('tbody', { key: 'tbody' },
-                                        filteredData
-                                            .sort((a, b) => b.ganho_diario - a.ganho_diario)
-                                            .map((item, index) =>
-                                                React.createElement('tr', {
-                                                    key: index,
-                                                    className: index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                                                }, [
-                                                    React.createElement('td', { key: 'c1', className: "px-4 py-2 font-medium" }, item.animal),
-                                                    React.createElement('td', { key: 'c2', className: "px-4 py-2" }, item.local),
-                                                    React.createElement('td', { key: 'c3', className: "px-4 py-2" }, item.sexo),
-                                                    React.createElement('td', { key: 'c4', className: "px-4 py-2 font-semibold" }, item.ganho_diario),
-                                                    React.createElement('td', { key: 'c5', className: "px-4 py-2" }, `${item.peso_inicial} kg`),
-                                                    React.createElement('td', { key: 'c6', className: "px-4 py-2" }, `${item.peso_final} kg`),
-                                                    React.createElement('td', { key: 'c7', className: "px-4 py-2" }, 
-                                                        React.createElement('span', {
-                                                            className: `px-2 py-1 rounded text-sm font-medium ${
-                                                                item.ganho_diario >= media 
-                                                                    ? 'bg-green-100 text-green-800' 
-                                                                    : 'bg-red-100 text-red-800'
-                                                            }`
-                                                        }, item.ganho_diario >= media ? 'Acima da média' : 'Abaixo da média')
-                                                    )
-                                                ])
-                                            )
-                                    )
-                                ])
-                            ])
-                        ])
-                    ])
-                ])
-            ]);
-        };
-
-        // Renderizar o componente
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(AnimalWeightAnalyzer));
+                row.innerHTML = `
+                    <td style="font-weight: 500;">${item.animal}</td>
+                    <td>${item.local}</td>
+                    <td>${item.sexo}</td>
+                    <td style="font-weight: 600;">${item.ganho_diario}</td>
+                    <td>${item.peso_inicial} kg</td>
+                    <td>${item.peso_final} kg</td>
+                    <td>
+                        <span class="status-badge ${isAboveAverage ? 'above' : 'below'}">
+                            ${isAboveAverage ? 'Acima da média' : 'Abaixo da média'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
     </script>
 </body>
 </html>
