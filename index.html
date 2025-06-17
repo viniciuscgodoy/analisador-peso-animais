@@ -10,8 +10,8 @@
     <div id="root"></div>
 
     <!-- React e React DOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <!-- Recharts -->
     <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
@@ -25,11 +25,34 @@
     <!-- Lodash -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
     
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    
     <!-- Babel para transformar JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Script de verificação -->
+    <script>
+        // Verificar se todas as bibliotecas carregaram
+        window.addEventListener('load', function() {
+            const missing = [];
+            if (typeof React === 'undefined') missing.push('React');
+            if (typeof ReactDOM === 'undefined') missing.push('ReactDOM');
+            if (typeof Recharts === 'undefined') missing.push('Recharts');
+            if (typeof XLSX === 'undefined') missing.push('XLSX');
+            if (typeof Papa === 'undefined') missing.push('PapaParse');
+            if (typeof _ === 'undefined') missing.push('Lodash');
+            if (typeof Babel === 'undefined') missing.push('Babel');
+            
+            if (missing.length > 0) {
+                document.body.innerHTML = `
+                    <div style="padding: 20px; text-align: center; font-family: Arial;">
+                        <h2 style="color: red;">❌ Erro ao carregar bibliotecas</h2>
+                        <p>Bibliotecas não carregadas: <strong>${missing.join(', ')}</strong></p>
+                        <p>Verifique sua conexão com a internet e recarregue a página.</p>
+                        <button onclick="location.reload()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Recarregar</button>
+                    </div>
+                `;
+            }
+        });
+    </script>
 
     <script type="text/babel">
         const { useState, useCallback } = React;
