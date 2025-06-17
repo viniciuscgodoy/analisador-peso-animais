@@ -128,7 +128,7 @@ Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalh
 
 ## 👨‍💻 Autor
 
-Seu Nome - [@seu_usuario](https://github.com/seu_usuario)
+Seu Nome - [@viniciuscgodoy](https://github.com/viniciuscgodoy)
 
 ## 🙏 Agradecimentos
 
