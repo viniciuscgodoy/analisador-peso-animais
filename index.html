@@ -467,7 +467,8 @@
                     const sortedRecords = records
                         .map(record => ({
                             ...record,
-                            parsedDate: parseDate(record.DATA_PESAGEM || record.data_pesagem || record.Data_Pesagem)
+                            parsedDate: parseDate(record.DATA || record.data || record.Data)
+
                         }))
                         .filter(record => record.parsedDate && !isNaN(record.PESO || record.peso || record.Peso))
                         .sort((a, b) => a.parsedDate - b.parsedDate);
